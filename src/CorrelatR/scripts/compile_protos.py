@@ -27,15 +27,17 @@ def main():
 
     if args.language == "java":
         delete_files = "*.java"
+        lite = "lite:"
     elif args.language == "python":
         delete_files = "*.py"
+        lite=""
 
     for path in proto_dir_path.glob(delete_files):
         path.unlink()
 
     for path in proto_dir_path.glob("*.proto"):
         subprocess.run(
-            f"protoc -I={args.proto_dir} --{args.language}_out={args.proto_dir} {path}", shell=True)
+            f"protoc -I={args.proto_dir} --{args.language}_out={lite}{args.proto_dir} {path}", shell=True)
 
 
 if __name__ == "__main__":
