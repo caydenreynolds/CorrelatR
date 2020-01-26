@@ -12,6 +12,8 @@ def handle_proto(proto):
         _change_column(proto.changeColumn)
     elif proto.WhichOneof("message") == "updateData":
         _update_data(proto.updateData)
+    elif proto.WhichOneof("message") == "ping":
+        print(f"Received a ping!")
 
 
 def _change_column(change_column):
