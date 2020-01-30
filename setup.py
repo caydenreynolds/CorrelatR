@@ -1,7 +1,9 @@
 from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = [
-    'sqlalchemy'
+    'sqlalchemy',
+    'pillow',
+    'protobuf'
 ]
 
 ENTRY_POINTS = {

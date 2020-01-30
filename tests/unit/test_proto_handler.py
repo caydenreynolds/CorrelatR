@@ -7,9 +7,9 @@ class TestProtoHandler(TestCase):
 
     @mock.patch.object(proto_handler, "_update_data")
     @mock.patch.object(proto_handler, "_change_column")
-    def test_test_framework(self, mock_change_column, mock_update_data):
+    def test_handle_proto(self, mock_change_column, mock_update_data):
         change_column_proto = client_pb2.ClientMessage()
-        change_column_proto.changeColumn.columnName = "foo"
+        change_column_proto.changeColumn.columnName.append("foo")
         proto_handler.handle_proto(change_column_proto)
 
         mock_change_column.assert_called_once()
