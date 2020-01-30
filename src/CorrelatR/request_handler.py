@@ -3,7 +3,7 @@ import socketserver
 from google.protobuf.reflection import ParseMessage
 
 from protos import client_pb2
-from CorrelatR import proto_handler
+from . import proto_handler
 
 
 class ClientRequestHandler(socketserver.BaseRequestHandler):
@@ -18,7 +18,9 @@ class ClientRequestHandler(socketserver.BaseRequestHandler):
         data = self._read_data(data_len)
 
         proto = ParseMessage(client_pb2.ClientMessage.DESCRIPTOR, data)
-        proto_handler.handle_proto(proto)
+        response = proto_handler.handle_proto(proto).SerializeToString()
+        self.request.send(len(response).to_bytes(4, byteorder="big"))
+        self.request.send(response)
 
     def finish(self):
         """Inhereted from base class"""
@@ -32,15 +34,7 @@ class ClientRequestHandler(socketserver.BaseRequestHandler):
 
         Returns: The read data as a bytearray
         """
-        data = bytearray(data_len)
-        offset = 0
-
-        while offset < data_len:
-            read_data = self.request.recv(1024).strip()
-            data[offset:len(read_data)] = read_data
-            offset += len(read_data)
-
-        return data
+        return self.request.recv(data_len)
 
     def _get_data_len(self):
         """Gets the length of the message the client is sending to us

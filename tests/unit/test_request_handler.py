@@ -15,7 +15,7 @@ class TestRequestHandler(TestCase):
 
         mock_read_data.return_value = proto.SerializeToString()
 
-        request_handler.ClientRequestHandler([0], [0], [0])
+        request_handler.ClientRequestHandler(mock.MagicMock(), [0], [0])
 
         mock_handle_proto.assert_called_once_with(proto)
 
@@ -36,5 +36,5 @@ class TestRequestHandler(TestCase):
     def test_get_data_len(self, mock_read_data, mock_handle_proto, mock_parse_message):
         mock_read_data.return_value = (1337).to_bytes(4, byteorder="big")
 
-        request_handler.ClientRequestHandler([0], [0], [0])
+        request_handler.ClientRequestHandler(mock.MagicMock(), [0], [0])
         mock_read_data.assert_called_with(1337)
