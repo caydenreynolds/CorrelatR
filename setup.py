@@ -3,13 +3,14 @@ from setuptools import find_packages, setup
 INSTALL_REQUIRES = [
     'sqlalchemy',
     'pillow',
-    'protobuf'
+    'protobuf',
+    'psycopg2'
 ]
 
 ENTRY_POINTS = {
     'console_scripts': [
-        'CorrelatR=CorrelatR.scripts.start_server:main',
-        'compile_protos=CorrelatR.scripts.compile_protos:main'
+        'CorrelatR=correlatr.scripts.start_server:main',
+        'compile_protos=correlatr.scripts.compile_protos:main'
     ]
 }
 
