@@ -21,5 +21,5 @@ def main():
 
 @atexit.register
 def stop_mysql():
-    print('Stopping mysql server!')
+    print('Stopping postgresql server!')
     subprocess.run('sudo service postgresql stop', shell=True)

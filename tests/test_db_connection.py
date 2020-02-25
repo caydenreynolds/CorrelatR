@@ -5,6 +5,7 @@ import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 
 from correlatr import db_connection
+from protos import shared_pb2
 
 class TestDbConnection(TestCase):
 
@@ -22,19 +23,30 @@ class TestDbConnection(TestCase):
         self.db_conn = db_connection.DBConnection(database_url, self.table_name)
         self.column_name = 'foo'
         self.safe_column_name = 'Zm9v'
+        self.columns = ['foo', 'bar', 'hello world']
+        self.data = [5, 0.0, 6.08]
+        self.data_points = {}
+
+        for i, column in enumerate(self.columns):
+            self.data_points[column] = self.data[i]
 
     def tearDown(self):
+        #Remove all rows
+        self.db_conn._session.query(self.db_conn._get_table()).delete(synchronize_session=False)
+        self.db_conn._session.commit()
+
+        #Remove extra colums
         for column in self.db_conn._get_table().c:
             column = str(column).rpartition('.')[2]
             if column != 'DATE':
                 self.db_conn._engine.execute(f'ALTER TABLE {self.table_name} DROP COLUMN "{column}"')
 
     def test_get_safe_column_name(self):
-        actual = self.db_conn._get_safe_column_name(self.column_name)
+        actual = db_connection.get_safe_column_name(self.column_name)
         self.assertEqual(actual, self.safe_column_name)
 
     def test_get_actual_column_name(self):
-        actual = self.db_conn._get_actual_column_name(self.safe_column_name)
+        actual = db_connection.get_actual_column_name(self.safe_column_name)
         self.assertEqual(actual, self.column_name)
 
     def test_add_column(self):
@@ -82,7 +94,7 @@ class TestDbConnection(TestCase):
         result = self.db_conn.rename_column(self.column_name, 'bar')
         self.assertFalse(result.statusMessage.error)
         self.assertTrue('DATE' in self.db_conn._get_table().c)
-        self.assertTrue(self.db_conn._get_safe_column_name('bar') in self.db_conn._get_table().c)
+        self.assertTrue(db_connection.get_safe_column_name('bar') in self.db_conn._get_table().c)
         self.assertEqual(len(self.db_conn._get_table().c), 2)
 
     def test_rename_column_does_not_exist(self):
@@ -96,7 +108,7 @@ class TestDbConnection(TestCase):
         result = self.db_conn.rename_column(self.column_name, self.column_name)
         self.assertTrue(result.statusMessage.error)
         self.assertTrue('DATE' in self.db_conn._get_table().c)
-        self.assertTrue(self.db_conn._get_safe_column_name(self.column_name) in self.db_conn._get_table().c)
+        self.assertTrue(db_connection.get_safe_column_name(self.column_name) in self.db_conn._get_table().c)
         self.assertEqual(len(self.db_conn._get_table().c), 2)
 
     def test_rename_column_old_empty(self):
@@ -111,17 +123,50 @@ class TestDbConnection(TestCase):
         result = self.db_conn.rename_column(self.column_name, '')
         self.assertTrue(result.statusMessage.error)
         self.assertTrue('DATE' in self.db_conn._get_table().c)
-        self.assertTrue(self.db_conn._get_safe_column_name(self.column_name) in self.db_conn._get_table().c)
+        self.assertTrue(db_connection.get_safe_column_name(self.column_name) in self.db_conn._get_table().c)
         self.assertEqual(len(self.db_conn._get_table().c), 2)
 
     def test_get_all_columns(self):
-        columns = ['foo', 'bar', 'hello world']
-        for column in columns:
+        for column in self.columns:
             self.db_conn.add_column(column)
 
         for column in self.db_conn.get_all_columns():
-            self.assertTrue(column in columns)
+            self.assertTrue(column in self.columns)
 
-        self.assertTrue(len(self.db_conn.get_all_columns()), columns)
+        self.assertTrue(len(self.db_conn.get_all_columns()), self.columns)
 
+    def test_set_data_none_exists(self):
+        for column in self.columns:
+            self.db_conn.add_column(column)
+
+        response = self.db_conn.set_data(1, self.data_points)
+        self.assertFalse(response.statusMessage.error)
+
+    def test_set_data_some_exists(self):
+        for column in self.columns:
+            self.db_conn.add_column(column)
+
+        self.db_conn.set_data(1, self.data_points)
+        response = self.db_conn.set_data(1, {self.columns[0]: 3.14})
+        self.assertFalse(response.statusMessage.error)
+
+    def test_get_data_none_exists(self):
+        for column in self.columns:
+            self.db_conn.add_column(column)
+
+        response = self.db_conn.get_data(1)
+        self.assertEqual(len(response.dataPoints), 3)
+        for point in response.dataPoints:
+            self.assertTrue(point.columnName in self.columns)
+
+    def test_get_data_some_exists(self):
+        for column in self.columns:
+            self.db_conn.add_column(column)
+
+        self.db_conn.set_data(1, self.data_points)
+        response = self.db_conn.get_data(1)
+        self.assertEqual(len(response.dataPoints), 3)
+        for point in response.dataPoints:
+            self.assertTrue(point.columnName in self.columns)
+            self.assertAlmostEqual(point.value, self.data_points[point.columnName], 5)
 

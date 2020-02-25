@@ -1,9 +1,14 @@
 from base64 import b64encode, b64decode
 
 import sqlalchemy
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
 from .response import create_response
+from protos import shared_pb2
+
+#Create a sessionmaker singleton
+_Session = sessionmaker()
 
 class DBConnection:
     TABLE_NAME = 'user_data'
@@ -17,16 +22,81 @@ class DBConnection:
             table_name (str): The name of the table to operate on
         """
         self._engine = sqlalchemy.create_engine(url)
+        _Session.configure(bind=self._engine)
         self.table_name = table_name
+        self._session = _Session()
 
+        #This will create the new table if and only if it does not exist alreadu
         Base = declarative_base()
         class UserTable(Base):
             __tablename__ = table_name
 
             DATE = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
-
-        #This will create the new table if and only if it does not exist alreadu
         Base.metadata.create_all(self._engine)
+
+    def set_data(self, date, data_points):
+        """Sets the given data point values to the row identified by the given date
+
+        Args:
+            date (int): The date to set the datapoints to
+            datapoints (dict): (Column, value) pairs to store in the database
+
+        Returns: The response message to send to the client 
+        """
+        table = self._get_table()
+        data = self._session.query(table).filter_by(DATE=date).one_or_none()
+        self._session.commit()
+
+        #Make column names safe
+        safe_points = {}
+        for key, value in data_points.items():
+            safe_points[get_safe_column_name(key)] = value
+        
+        if data is None:
+            ins = table.insert().values(DATE = date, **safe_points)
+            self._engine.connect().execute(ins)
+            return create_response('Inserting a new row into the database', False)
+        else:
+            upd = table.update().where(table.c.DATE == date).values(**safe_points)
+            self._engine.connect().execute(upd)
+
+            return create_response('Updating a row in the database', False)
+
+    def get_data(self, date):
+        """Get all of the data associated with a specific date as a list of tuples
+
+        Args:
+            date (int): Date to get data from
+        
+        Returns: A list of tuples describing (column_name, data)
+        """
+        table = self._get_table()
+        data = self._session.query(table).filter_by(DATE=date).one_or_none()
+        self._session.commit()
+        if data is None:
+            response = create_response('No row present in database for this date', False)
+            columns = self.get_all_columns()
+            for column in columns:
+                data_point = shared_pb2.DataPoint()
+                data_point.columnName = column
+                data_point.null = True
+                response.dataPoints.append(data_point)
+        else:
+            data = data._asdict()
+            response = create_response('Row already present in database for this date', False)
+            for column in table.c:
+                column_name = str(column).partition('.')[2]
+                if column_name != "DATE":
+                    data_point = shared_pb2.DataPoint()
+                    data_point.columnName = get_actual_column_name(column_name)
+
+                    if data[column_name]:
+                        data_point.value = data[column_name]
+                    else:
+                        data_point.null = True
+                    response.dataPoints.append(data_point)
+                    
+        return response
 
     def get_all_columns(self):
         """Get the names of all the columns in the table
@@ -37,7 +107,7 @@ class DBConnection:
         columns = []
         for column in table.c:
             if column.name != "DATE":
-                columns.append(self._get_actual_column_name(column.name))
+                columns.append(get_actual_column_name(column.name))
 
         return columns
 
@@ -49,14 +119,14 @@ class DBConnection:
 
         Returns: The response message to send to the client
         """
-        safe_column_name = self._get_safe_column_name(column_name)
+        safe_column_name = get_safe_column_name(column_name)
         table = self._get_table()
         if not safe_column_name:
             return create_response(f"Cannot create column without a name!", True)
         elif safe_column_name in table.c:
             return create_response(f"{column_name} already exists", True)
         else:
-            self._engine.execute(f'ALTER TABLE {self.table_name} ADD COLUMN "{safe_column_name}" float')
+            self._engine.connect().execute(f'ALTER TABLE {self.table_name} ADD COLUMN "{safe_column_name}" float')
             return create_response(f"{column_name} has been added", False)
 
     def remove_column(self, column_name):
@@ -67,12 +137,12 @@ class DBConnection:
 
         Returns: The response message to send to the client
         """
-        safe_column_name = self._get_safe_column_name(column_name)
+        safe_column_name = get_safe_column_name(column_name)
         table = self._get_table()
         if safe_column_name not in table.c:
             return create_response(f"{column_name} is not in the table", True)
         else:
-            self._engine.execute(f'ALTER TABLE {self.table_name} DROP COLUMN "{safe_column_name}"')
+            self._engine.connect().execute(f'ALTER TABLE {self.table_name} DROP COLUMN "{safe_column_name}"')
             return create_response(f"{column_name} has been removed", False)
 
     def rename_column(self, old_column_name, new_column_name):
@@ -84,8 +154,8 @@ class DBConnection:
 
         Returns: The response message to send to the client
         """
-        safe_new_column_name = self._get_safe_column_name(new_column_name)
-        safe_old_column_name = self._get_safe_column_name(old_column_name)
+        safe_new_column_name = get_safe_column_name(new_column_name)
+        safe_old_column_name = get_safe_column_name(old_column_name)
         table = self._get_table()
 
         if not new_column_name:
@@ -95,7 +165,7 @@ class DBConnection:
         elif safe_new_column_name == safe_old_column_name:
             return create_response(f'{old_column_name} is the same as {new_column_name}', True)
         else:
-            self._engine.execute(f'ALTER TABLE {self.table_name} RENAME COLUMN "{safe_old_column_name}" TO "{safe_new_column_name}"')
+            self._engine.connect().execute(f'ALTER TABLE {self.table_name} RENAME COLUMN "{safe_old_column_name}" TO "{safe_new_column_name}"')
             return create_response(f"{old_column_name} has been renamed to {new_column_name}", False)
 
     def _get_table(self):
@@ -109,24 +179,24 @@ class DBConnection:
         metadata = sqlalchemy.MetaData()
         return sqlalchemy.Table(self.table_name, metadata, autoload=True, autoload_with=self._engine)
 
-    def _get_safe_column_name(self, column_name):
-        """Get the safe sql column name from the given string
+def get_safe_column_name(column_name):
+    """Get the safe sql column name from the given string
 
-        Args:
-            column_name (str): name of the column to make safe
+    Args:
+        column_name (str): name of the column to make safe
 
-        Returns: The safe name of the column
-        """
-        return b64encode(column_name.encode("utf-8")).decode("ascii")
+    Returns: The safe name of the column
+    """
+    return b64encode(column_name.encode("utf-8")).decode("ascii")
 
-    def _get_actual_column_name(self, safe_column_name):
-        """Converts the safe sql column name to an actual column name
+def get_actual_column_name(safe_column_name):
+    """Converts the safe sql column name to an actual column name
 
-        Args:
-            safe_column_name (str): The safe column name
+    Args:
+        safe_column_name (str): The safe column name
 
-        Returns: The actual name of the column
-        """
-        return b64decode(safe_column_name.encode("ascii")).decode("utf-8")
+    Returns: The actual name of the column
+    """
+    return b64decode(safe_column_name.encode("ascii")).decode("utf-8")
 
 

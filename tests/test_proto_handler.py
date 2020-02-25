@@ -1,7 +1,7 @@
 from unittest import TestCase, mock
 
 from correlatr import proto_handler
-from protos import client_pb2
+from protos import client_pb2, shared_pb2
 
 class TestProtoHandler(TestCase):
     @mock.patch.object(proto_handler, "DBConnection")
@@ -23,3 +23,23 @@ class TestProtoHandler(TestCase):
 
         protobuf_message_handler._column_change.assert_called_once()
         protobuf_message_handler._update_data.assert_called_once()
+
+    @mock.patch.object(proto_handler, "DBConnection")
+    def test_dictify_datapoints(self, _):
+        datapoints = []
+        datapoints.append(shared_pb2.DataPoint())
+        datapoints[0].columnName = "foo"
+        datapoints[0].value = 1
+
+        datapoints.append(shared_pb2.DataPoint())
+        datapoints[1].columnName = "bar"
+        datapoints[1].value = 6.0869
+
+        datapoints.append(shared_pb2.DataPoint())
+        datapoints[2].columnName = "baz"
+        datapoints[2].null = True
+
+        expected_result = {"foo": 1.0, "bar": 6.0869}
+        for key, value in proto_handler.ProtoHandler('')._dictify_datapoints(datapoints).items():
+            self.assertTrue(key in expected_result)
+            self.assertAlmostEqual(expected_result[key], value, 5)
