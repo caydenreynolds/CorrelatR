@@ -83,8 +83,7 @@ class ProtoHandler:
             return create_response("No data updates to perform", True)
         else:
             update_data.date = update_data.date // 1000
-            print(f"An update of ({update_data.newData[0].columnName},{update_data.newData[0].value}) "
-                  f"has been requested on date {date.fromtimestamp(update_data.date)}")
+            print(f"An update has been requested on date {date.fromtimestamp(update_data.date)}")
             return self.db_conn.set_data(update_data.date, self._dictify_datapoints(update_data.newData))
 
     def _image_request(self, graph_request):
@@ -148,5 +147,6 @@ class ProtoHandler:
         for point in data_points:
             if not point.null:
                 result[point.columnName] = point.value
-                print(result)
+            else:
+                result[point.columnName] = None
         return result

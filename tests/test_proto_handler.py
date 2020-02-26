@@ -39,7 +39,7 @@ class TestProtoHandler(TestCase):
         datapoints[2].columnName = "baz"
         datapoints[2].null = True
 
-        expected_result = {"foo": 1.0, "bar": 6.0869}
+        expected_result = {"foo": 1.0, "bar": 6.0869, "baz": None}
         for key, value in proto_handler.ProtoHandler('')._dictify_datapoints(datapoints).items():
             self.assertTrue(key in expected_result)
             self.assertAlmostEqual(expected_result[key], value, 5)

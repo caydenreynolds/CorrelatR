@@ -147,7 +147,7 @@ class TestDbConnection(TestCase):
             self.db_conn.add_column(column)
 
         self.db_conn.set_data(1, self.data_points)
-        response = self.db_conn.set_data(1, {self.columns[0]: 3.14})
+        response = self.db_conn.set_data(1, {self.columns[0]: 3.14, self.columns[1]: None})
         self.assertFalse(response.statusMessage.error)
 
     def test_get_data_none_exists(self):
