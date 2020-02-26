@@ -1,14 +1,12 @@
 """Python script that finds all *.proto files in a directory, and invokes protoc to compile them to
-golang. Note that later this script will need to be extended to include other languages
+python
 """
-import pathlib
 import argparse
+import pathlib
+import re
 import subprocess
 
-
 def main():
-    language_options = ['python', 'java']
-
     parser = argparse.ArgumentParser(
         description='Directory to look for protos')
     parser.add_argument('proto_dir', metavar='proto_dir', type=str,
@@ -27,6 +25,15 @@ def main():
         subprocess.run(
             f"protoc -I={args.proto_dir} --python_out={args.proto_dir} {path}", shell=True)
 
+        #*_pb2.py files are generated with broken relative imports. We need to fix that.
+        pb2_path = pathlib.Path(f'{path.parent}/{path.stem}_pb2.py')
+        text = pb2_path.read_text()
+        regex = re.compile("import .*?_pb2")
+        results = regex.findall(text)
+        for result in results:
+            text = text.replace(result, f'from . {result}')
+        pb2_path.write_text(text)
+        
 
 if __name__ == "__main__":
     main()
