@@ -3,15 +3,13 @@ from io import BytesIO
 import random
 import traceback
 
-from PIL import Image
+from matplotlib import pyplot
+from pandas import DataFrame, Series
+import seaborn
 
 from protos import client_pb2, server_pb2, shared_pb2
 from .db_connection import DBConnection, get_safe_column_name
 from .response import create_response
-
-#TODO: Put these in a config file
-IMAGE_SIZE = (200, 200) 
-IMAGE_MODE = "RGB"
 
 class ProtoHandler:
     def __init__(self, db_url):
@@ -46,7 +44,6 @@ class ProtoHandler:
         except Exception:
             print(traceback.format_exc())
             return create_response("Unkown server error", True)
-
 
     def _columnsRequest(self, columns_request):
         print("Columns requested!")
@@ -94,13 +91,21 @@ class ProtoHandler:
             
         Returns: The response message to send to the client
         """
-        random.seed()
-        image = Image.new(IMAGE_MODE, IMAGE_SIZE, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-        response = create_response("Success", False)
+        #Generate plot
+        horizontal_data, vertical_data = self.db_conn.get_all_points_in_columns(
+            graph_request.horizontal, graph_request.vertical)
+        data_frame = DataFrame({graph_request.horizontal: Series(horizontal_data),
+                                graph_request.vertical: Series(vertical_data)})
+        plot = seaborn.lmplot(x=graph_request.horizontal, y=graph_request.vertical, data=data_frame, scatter=True)
+
+        #Save plot
         image_bytes = BytesIO()
-        image.save(image_bytes, "jpeg")
+        plot.savefig(image_bytes, format='jpeg', bbox_inches='tight', fit_reg=True)
+        pyplot.close()
+        response = create_response("Success", False)
         response.graphImage = image_bytes.getvalue()
-        print("A graph has been requested!")
+
+        print(f"A graph has been requested with horizontal axis {graph_request.horizontal} and vertical axis {graph_request.vertical}!")
         return response
 
     def _column_change(self, change_column_message):

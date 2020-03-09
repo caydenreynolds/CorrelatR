@@ -2,9 +2,12 @@ from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = [
     'sqlalchemy',
-    'pillow',
+    'matplotlib',
     'protobuf',
-    'psycopg2'
+    'psycopg2',
+    'pillow',
+    'pandas',
+    'seaborn'
 ]
 
 ENTRY_POINTS = {

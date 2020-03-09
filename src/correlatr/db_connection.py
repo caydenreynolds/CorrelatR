@@ -34,6 +34,36 @@ class DBConnection:
             DATE = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
         Base.metadata.create_all(self._engine)
 
+
+    def get_all_points_in_columns(self, column1, column2):
+        """Gets all points from both of the given columns.
+        Points are only returned if data is present in both columns for a given row.
+        Data is returned as two lists, where all values from column1 are in the first list,
+        and all values in column2 are in the second list. Additionally, list1[0] and list2[0] 
+        are from the same row in the database
+
+        Args:
+            column1 (str): The first column to pull values from
+            column2 (str): The second column to pull values from
+        
+        Returns:
+            Two lists, with all values from column1 and column 2
+        """
+        column1 = get_safe_column_name(column1)
+        column2 = get_safe_column_name(column2)
+        table = self._get_table()
+
+        list1 = []
+        list2 = [] 
+
+        for row in self._session.query(table).all():
+            row = row._asdict()
+            if row[column1] is not None and row[column2] is not None:
+                list1.append(row[column1])
+                list2.append(row[column2])
+
+        return list1, list2
+
     def set_data(self, date, data_points):
         """Sets the given data point values to the row identified by the given date
 
@@ -125,6 +155,8 @@ class DBConnection:
             return create_response(f"Cannot create column without a name!", True)
         elif safe_column_name in table.c:
             return create_response(f"{column_name} already exists", True)
+        elif len(safe_column_name) > 63:
+            return create_response(f"Column name {column_name} is too long!", True)
         else:
             self._engine.connect().execute(f'ALTER TABLE {self.table_name} ADD COLUMN "{safe_column_name}" float')
             return create_response(f"{column_name} has been added", False)
