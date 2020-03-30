@@ -4,7 +4,8 @@ INSTALL_REQUIRES = [
     'sqlalchemy',
     'pillow',
     'protobuf',
-    'psycopg2'
+    'psycopg2',
+    'seaborn'
 ]
 
 ENTRY_POINTS = {

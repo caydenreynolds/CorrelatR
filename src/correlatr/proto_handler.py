@@ -1,17 +1,15 @@
+import traceback
 from datetime import date
 from io import BytesIO
-import random
-import traceback
 
-from PIL import Image
+from matplotlib import pyplot
+from pandas import DataFrame
+import seaborn
 
 from protos import client_pb2, server_pb2, shared_pb2
 from .db_connection import DBConnection, get_safe_column_name
 from .response import create_response
 
-#TODO: Put these in a config file
-IMAGE_SIZE = (200, 200) 
-IMAGE_MODE = "RGB"
 
 class ProtoHandler:
     def __init__(self, db_url):
@@ -94,11 +92,12 @@ class ProtoHandler:
             
         Returns: The response message to send to the client
         """
-        random.seed()
-        image = Image.new(IMAGE_MODE, IMAGE_SIZE, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-        response = create_response("Success", False)
+        points = self.db_conn.get_data_in_columns(graph_request.horizontal, graph_request.vertical)
+        points = DataFrame(points, columns=[graph_request.horizontal, graph_request.vertical])
+        seaborn.lmplot(x=graph_request.horizontal, y=graph_request.vertical, data=points)
         image_bytes = BytesIO()
-        image.save(image_bytes, "jpeg")
+        pyplot.savefig(image_bytes)
+        response = create_response("Success", False)
         response.graphImage = image_bytes.getvalue()
         print("A graph has been requested!")
         return response
@@ -133,7 +132,7 @@ class ProtoHandler:
         """
         data_request_message.date = data_request_message.date // 1000
         print(f'Data requested for date {date.fromtimestamp(data_request_message.date)}!')
-        return self.db_conn.get_data(data_request_message.date)
+        return self.db_conn.get_data_for_date(data_request_message.date)
 
     def _dictify_datapoints(self, data_points):
         """Converts a list of datapoints to a dict
