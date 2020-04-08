@@ -31,15 +31,10 @@ class TestDbConnection(TestCase):
             self.data_points[column] = self.data[i]
 
     def tearDown(self):
-        #Remove all rows
-        self.db_conn._session.query(self.db_conn._get_table()).delete(synchronize_session=False)
-        self.db_conn._session.commit()
-
-        #Remove extra colums
-        for column in self.db_conn._get_table().c:
-            column = str(column).rpartition('.')[2]
-            if column != 'DATE':
-                self.db_conn._engine.execute(f'ALTER TABLE {self.table_name} DROP COLUMN "{column}"')
+        #Remove table -- We have to drop the table to avoid hitting the column limit
+        #Simply removing columns will not work
+        # https://nerderati.com/2017/01/03/postgresql-tables-can-have-at-most-1600-columns/
+        self.db_conn._engine.execute(f'DROP TABLE {self.table_name};')
 
     def test_get_safe_column_name(self):
         actual = db_connection.get_safe_column_name(self.column_name)
@@ -160,7 +155,7 @@ class TestDbConnection(TestCase):
         for column in self.columns:
             self.db_conn.add_column(column)
 
-        response = self.db_conn.get_data(1)
+        response = self.db_conn.get_data_for_date(1)
         self.assertEqual(len(response.dataPoints), 3)
         for point in response.dataPoints:
             self.assertTrue(point.columnName in self.columns)
@@ -170,9 +165,19 @@ class TestDbConnection(TestCase):
             self.db_conn.add_column(column)
 
         self.db_conn.set_data(1, self.data_points)
-        response = self.db_conn.get_data(1)
+        response = self.db_conn.get_data_for_date(1)
         self.assertEqual(len(response.dataPoints), 3)
         for point in response.dataPoints:
             self.assertTrue(point.columnName in self.columns)
             self.assertAlmostEqual(point.value, self.data_points[point.columnName], 5)
 
+    def test_get_data_in_columns(self):
+        for column in self.columns:
+            self.db_conn.add_column(column)
+
+        self.db_conn.set_data(1, self.data_points)
+        self.db_conn.set_data(2, {'foo': 7, 'bar': 12})
+        self.db_conn.set_data(3, {'foo': 3})
+
+        result = self.db_conn.get_data_in_columns('foo', 'bar')
+        self.assertListEqual(result, [(5.0, 0.0), (7.0, 12.0)])

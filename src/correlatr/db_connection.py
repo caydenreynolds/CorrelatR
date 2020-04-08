@@ -34,36 +34,6 @@ class DBConnection:
             DATE = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True)
         Base.metadata.create_all(self._engine)
 
-
-    def get_all_points_in_columns(self, column1, column2):
-        """Gets all points from both of the given columns.
-        Points are only returned if data is present in both columns for a given row.
-        Data is returned as two lists, where all values from column1 are in the first list,
-        and all values in column2 are in the second list. Additionally, list1[0] and list2[0] 
-        are from the same row in the database
-
-        Args:
-            column1 (str): The first column to pull values from
-            column2 (str): The second column to pull values from
-        
-        Returns:
-            Two lists, with all values from column1 and column 2
-        """
-        column1 = get_safe_column_name(column1)
-        column2 = get_safe_column_name(column2)
-        table = self._get_table()
-
-        list1 = []
-        list2 = [] 
-
-        for row in self._session.query(table).all():
-            row = row._asdict()
-            if row[column1] is not None and row[column2] is not None:
-                list1.append(row[column1])
-                list2.append(row[column2])
-
-        return list1, list2
-
     def set_data(self, date, data_points):
         """Sets the given data point values to the row identified by the given date
 
@@ -92,7 +62,7 @@ class DBConnection:
 
             return create_response('Updating a row in the database', False)
 
-    def get_data(self, date):
+    def get_data_for_date(self, date):
         """Get all of the data associated with a specific date as a list of tuples
 
         Args:
@@ -127,6 +97,32 @@ class DBConnection:
                     response.dataPoints.append(data_point)
                     
         return response
+
+    def get_data_in_columns(self, column1, column2):
+        """Gets all the values of two columns, stored as a list of tuples where row is
+        date | column1 | column2
+
+        if column1 or column2 is not set, a tuple is not created
+
+        Args:
+            column1: 1st column to get values from
+            column2: 2nd column to get values from
+        
+        Returns: The list of tuples
+        """
+        safe_column1 = get_safe_column_name(column1)
+        safe_column2 = get_safe_column_name(column2)
+
+        table = self._get_table()
+        query_results = self._session.query(table.c[safe_column1], table.c[safe_column2]).all()
+        self._session.commit()
+
+        trimmed_results = []
+        for result in query_results:
+            if result[0] is not None and result[1] is not None:
+                trimmed_results.append(result)
+
+        return trimmed_results
 
     def get_all_columns(self):
         """Get the names of all the columns in the table
@@ -202,9 +198,6 @@ class DBConnection:
 
     def _get_table(self):
         """Loads the 'table_name' database table
-
-        Args:
-            table_name (str): Name of the table to load
 
         Returns: SqlAlchemy Table reflected from 'table_name'
         """

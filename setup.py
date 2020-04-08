@@ -5,7 +5,6 @@ INSTALL_REQUIRES = [
     'matplotlib',
     'protobuf',
     'psycopg2',
-    'pillow',
     'pandas',
     'seaborn'
 ]

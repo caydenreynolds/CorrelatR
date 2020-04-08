@@ -1,10 +1,9 @@
+import traceback
 from datetime import date
 from io import BytesIO
-import random
-import traceback
 
 from matplotlib import pyplot
-from pandas import DataFrame, Series
+from pandas import DataFrame
 import seaborn
 
 from protos import client_pb2, server_pb2, shared_pb2
@@ -91,21 +90,14 @@ class ProtoHandler:
             
         Returns: The response message to send to the client
         """
-        #Generate plot
-        horizontal_data, vertical_data = self.db_conn.get_all_points_in_columns(
-            graph_request.horizontal, graph_request.vertical)
-        data_frame = DataFrame({graph_request.horizontal: Series(horizontal_data),
-                                graph_request.vertical: Series(vertical_data)})
-        plot = seaborn.lmplot(x=graph_request.horizontal, y=graph_request.vertical, data=data_frame, scatter=True)
-
-        #Save plot
+        points = self.db_conn.get_data_in_columns(graph_request.horizontal, graph_request.vertical)
+        points = DataFrame(points, columns=[graph_request.horizontal, graph_request.vertical])
+        seaborn.lmplot(x=graph_request.horizontal, y=graph_request.vertical, data=points)
         image_bytes = BytesIO()
-        plot.savefig(image_bytes, format='jpeg', bbox_inches='tight', fit_reg=True)
-        pyplot.close()
+        pyplot.savefig(image_bytes)
         response = create_response("Success", False)
         response.graphImage = image_bytes.getvalue()
-
-        print(f"A graph has been requested with horizontal axis {graph_request.horizontal} and vertical axis {graph_request.vertical}!")
+        print("A graph has been requested!")
         return response
 
     def _column_change(self, change_column_message):
@@ -138,7 +130,7 @@ class ProtoHandler:
         """
         data_request_message.date = data_request_message.date // 1000
         print(f'Data requested for date {date.fromtimestamp(data_request_message.date)}!')
-        return self.db_conn.get_data(data_request_message.date)
+        return self.db_conn.get_data_for_date(data_request_message.date)
 
     def _dictify_datapoints(self, data_points):
         """Converts a list of datapoints to a dict
