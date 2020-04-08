@@ -2,9 +2,10 @@ from setuptools import find_packages, setup
 
 INSTALL_REQUIRES = [
     'sqlalchemy',
-    'pillow',
+    'matplotlib',
     'protobuf',
     'psycopg2',
+    'pandas',
     'seaborn'
 ]
 

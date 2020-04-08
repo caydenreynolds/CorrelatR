@@ -65,6 +65,12 @@ class TestDbConnection(TestCase):
         self.assertTrue(result.statusMessage.error)
         self.assertEqual(len(self.db_conn._get_table().c), 1)
 
+    def test_add_column_LONG_name(self):
+        result = self.db_conn.add_column('a' * 100)
+        self.assertTrue('DATE' in self.db_conn._get_table().c)
+        self.assertTrue(result.statusMessage.error)
+        self.assertEqual(len(self.db_conn._get_table().c), 1)
+
     def test_remove_column(self):
         self.db_conn.add_column(self.column_name)
         result = self.db_conn.remove_column(self.column_name)

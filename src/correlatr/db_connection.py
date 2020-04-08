@@ -151,6 +151,8 @@ class DBConnection:
             return create_response(f"Cannot create column without a name!", True)
         elif safe_column_name in table.c:
             return create_response(f"{column_name} already exists", True)
+        elif len(safe_column_name) > 63:
+            return create_response(f"Column name {column_name} is too long!", True)
         else:
             self._engine.connect().execute(f'ALTER TABLE {self.table_name} ADD COLUMN "{safe_column_name}" float')
             return create_response(f"{column_name} has been added", False)

@@ -10,7 +10,6 @@ from protos import client_pb2, server_pb2, shared_pb2
 from .db_connection import DBConnection, get_safe_column_name
 from .response import create_response
 
-
 class ProtoHandler:
     def __init__(self, db_url):
         """A class that handles the requested action from a client proto
@@ -44,7 +43,6 @@ class ProtoHandler:
         except Exception:
             print(traceback.format_exc())
             return create_response("Unkown server error", True)
-
 
     def _columnsRequest(self, columns_request):
         print("Columns requested!")
